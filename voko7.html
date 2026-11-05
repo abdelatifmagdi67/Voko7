@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VOKO7 – شارك الأكواد والنصوص</title>
+<style>
+:root{--bg:#f5f5f5;--card:#fff;--fg:#111;--mut:#6b7280;--line:#d1d5db;--pri:#6d8bff;--pri-d:#4f6df0;--code:#0f9b8e;--gut:#ececec}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171c;--card:#1f1f26;--fg:#f3f4f6;--mut:#9ca3af;--line:#3a3a45;--gut:#26262e;--code:#4fd1c5}}
+:root[data-theme="dark"]{--bg:#17171c;--card:#1f1f26;--fg:#f3f4f6;--mut:#9ca3af;--line:#3a3a45;--gut:#26262e;--code:#4fd1c5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.logo{font-size:36px;font-weight:900;letter-spacing:1px;color:#fff;-webkit-text-stroke:1.5px #111;paint-order:stroke fill;text-shadow:2px 2px 0 #c4b5fd;font-family:Arial,sans-serif;cursor:pointer;direction:ltr}
+.ib{background:none;border:0;color:var(--fg);font-size:26px;cursor:pointer;padding:6px 10px;border-radius:8px}
+.ib:hover{background:var(--gut)}
+input.name{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);font-size:16px;margin-bottom:12px;direction:ltr;text-align:left}
+.editor{display:flex;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;direction:ltr}
+.gut{background:var(--gut);color:var(--mut);padding:12px 10px;text-align:right;font:14px/1.6 ui-monospace,Menlo,Consolas,monospace;user-select:none;min-width:44px;white-space:pre;overflow:hidden}
+textarea.ta{flex:1;border:0;outline:0;resize:vertical;min-height:300px;padding:12px;background:transparent;color:var(--fg);font:14px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;direction:ltr;text-align:left}
+.row{display:flex;gap:10px;margin-top:12px}
+.btn{flex:1;padding:14px;border:0;border-radius:10px;background:var(--pri);color:#fff;font-size:17px;cursor:pointer;font-family:inherit}
+.btn:hover:not(:disabled){background:var(--pri-d)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.sq{width:52px;flex:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;font-size:20px;cursor:pointer}
+.tools{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tool{border:1px solid var(--line);background:var(--card);color:var(--fg);padding:9px 14px;border-radius:10px;cursor:pointer;font-size:15px;font-family:inherit}
+.tool.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.title{direction:ltr;text-align:left;color:var(--mut);margin:0 0 10px;font-size:15px}
+pre.view{margin:0;padding:12px;font:14px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--code);white-space:pre;overflow:auto;direction:ltr;text-align:left;flex:1;min-width:0}
+pre.raw{color:var(--fg)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:999px;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.recent h3{margin:24px 0 8px;font-size:16px;color:var(--mut)}
+.item{display:flex;justify-content:space-between;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);margin-bottom:8px;cursor:pointer}
+.item span:first-child{direction:ltr}.item span:last-child{color:var(--mut);font-size:13px}
+.msg{text-align:center;color:var(--mut);padding:40px 0}
+footer{margin-top:40px;text-align:center;color:var(--mut);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="ib" id="themeBtn" title="الوضع">◐</button>
+    <div class="logo" id="logo">VOKO7</div>
+    <button class="ib" id="newBtn" title="جديد">＋</button>
+  </header>
+  <main id="app"></main>
+  <footer>VOKO7 — الصق الكود، اضغط إرسال، وشارك الرابط</footer>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function(){
+var app=document.getElementById('app'),toastEl=document.getElementById('toast');
+function $(s){return document.querySelector(s)}
+function toast(t){toastEl.textContent=t;toastEl.classList.add('show');setTimeout(function(){toastEl.classList.remove('show')},1800)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function lines(t){var n=t.split('\n').length,a=[];for(var i=1;i<=n;i++)a.push(i);return a.join('\n')}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+
+/* ترميز المحتوى داخل الرابط نفسه (بدون سيرفر) */
+function b64u(bytes){var s='';for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function unb64u(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+async function pipe(bytes,stream){var w=stream.writable.getWriter();w.write(bytes);w.close();return new Uint8Array(await new Response(stream.readable).arrayBuffer())}
+async function encode(obj){
+  var raw=new TextEncoder().encode(JSON.stringify(obj));
+  if(window.CompressionStream){return 'z'+b64u(await pipe(raw,new CompressionStream('deflate-raw')))}
+  return 'p'+b64u(raw);
+}
+async function decode(h){
+  var bytes=unb64u(h.slice(1));
+  if(h[0]==='z')bytes=await pipe(bytes,new DecompressionStream('deflate-raw'));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function copy(t){
+  function fb(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast('تم النسخ ✓')}catch(e){toast('تعذر النسخ')}a.remove()}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('تم النسخ ✓')},fb);else fb();
+}
+function home(){
+  if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+  app.innerHTML='<input class="name" id="fname" placeholder="file.js" dir="ltr">'+
+  '<div class="editor"><div class="gut" id="gut">1</div><textarea class="ta" id="ta" placeholder="ألصق هنا" spellcheck="false"></textarea></div>'+
+  '<div class="row"><button class="btn" id="send" disabled>إرسال</button><button class="sq" id="clr" title="مسح">🗑</button></div>'+
+  '<div class="recent" id="recent"></div>';
+  var ta=$('#ta'),gut=$('#gut'),send=$('#send');
+  function upd(){gut.textContent=lines(ta.value);send.disabled=!ta.value.trim()}
+  ta.addEventListener('input',upd);
+  ta.addEventListener('scroll',function(){gut.scrollTop=ta.scrollTop});
+  ta.addEventListener('keydown',function(e){if(e.key==='Tab'){e.preventDefault();var s=ta.selectionStart;ta.value=ta.value.slice(0,s)+'  '+ta.value.slice(ta.selectionEnd);ta.selectionStart=ta.selectionEnd=s+2;upd()}});
+  $('#clr').onclick=function(){ta.value='';upd()};
+  send.onclick=async function(){
+    send.disabled=true;send.textContent='جارٍ الإرسال...';
+    try{
+      var name=$('#fname').value.trim()||'file.txt',h=await encode({n:name,x:ta.value});
+      if(h.length>200000){toast('النص كبير جدًا للمشاركة بالرابط');send.disabled=false;send.textContent='إرسال';return}
+      try{var l=JSON.parse(lsGet('v7recent')||'[]');l.unshift({n:name,h:h,t:Date.now()});if(h.length>40000)l[0].h='';lsSet('v7recent',JSON.stringify(l.slice(0,8)))}catch(e){}
+      location.hash=h;
+    }catch(e){toast('حدث خطأ');send.disabled=false;send.textContent='إرسال'}
+  };
+  try{var r=JSON.parse(lsGet('v7recent')||'[]').filter(function(x){return x.h});
+    if(r.length){var h='<h3>آخر ما أرسلته</h3>';r.forEach(function(x,i){h+='<div class="item" data-i="'+i+'"><span>'+esc(x.n)+'</span><span>'+new Date(x.t).toLocaleDateString('ar-EG')+'</span></div>'});$('#recent').innerHTML=h;
+      document.querySelectorAll('.item').forEach(function(el){el.onclick=function(){location.hash=r[el.dataset.i].h}})}}catch(e){}
+}
+async function show(h){
+  app.innerHTML='<div class="msg">جارٍ التحميل...</div>';
+  var p;try{p=await decode(h)}catch(e){p=null}
+  if(!p||typeof p.x!=='string'){app.innerHTML='<div class="msg">الرابط غير صالح أو ناقص 😕<br><br><button class="tool" id="bk">الصفحة الرئيسية</button></div>';$('#bk').onclick=function(){location.hash=''};return}
+  var raw=false;
+  app.innerHTML='<div class="tools"><button class="tool" id="dl">⬇ تنزيل</button><button class="tool" id="rw">RAW</button><button class="tool" id="sh">🔗 مشاركة</button><button class="tool" id="cp">📋 نسخ</button></div>'+
+  '<p class="title">'+esc(p.n||'file.txt')+'</p><div class="editor"><div class="gut">'+lines(p.x)+'</div><pre class="view" id="pv">'+esc(p.x)+'</pre></div>';
+  var pv=$('#pv');
+  $('#rw').onclick=function(){raw=!raw;pv.classList.toggle('raw',raw);this.classList.toggle('on',raw)};
+  $('#cp').onclick=function(){copy(p.x)};
+  $('#sh').onclick=function(){copy(location.href)};
+  $('#dl').onclick=function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([p.x],{type:'text/plain'}));a.download=p.n||'file.txt';a.click()};
+}
+function route(){var h=location.hash.slice(1);if(h)show(h);else home()}
+$('#logo').onclick=$('#newBtn').onclick=function(){if(location.hash)location.hash='';else home()};
+$('#themeBtn').onclick=function(){var r=document.documentElement,dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#17171c';r.dataset.theme=dark?'light':'dark'};
+window.addEventListener('hashchange',route);
+route();
+})();
+</script>
+</body>
+</html>
