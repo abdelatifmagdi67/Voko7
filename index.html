@@ -6,7 +6,7 @@
 <title>VOKO7 – شارك الأكواد والنصوص</title>
 <style>
 :root{--bg:#f5f5f5;--card:#fff;--fg:#111;--mut:#6b7280;--line:#d1d5db;--pri:#6d8bff;--pri-d:#4f6df0;--code:#0f9b8e;--gut:#ececec}
-@TiFA (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171c;--card:#1f1f26;--fg:#f3f4f6;--mut:#9ca3af;--line:#3a3a45;--gut:#26262e;--code:#4fd1c5}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171c;--card:#1f1f26;--fg:#f3f4f6;--mut:#9ca3af;--line:#3a3a45;--gut:#26262e;--code:#4fd1c5}}
 :root[data-theme="dark"]{--bg:#17171c;--card:#1f1f26;--fg:#f3f4f6;--mut:#9ca3af;--line:#3a3a45;--gut:#26262e;--code:#4fd1c5}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;min-height:100vh}
@@ -36,12 +36,18 @@ pre.raw{color:var(--fg)}
 .item span:first-child{direction:ltr}.item span:last-child{color:var(--mut);font-size:13px}
 .msg{text-align:center;color:var(--mut);padding:40px 0}
 footer{margin-top:40px;text-align:center;color:var(--mut);font-size:13px}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.box{background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:380px}
+.box input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-size:16px;margin-bottom:10px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tab{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);cursor:pointer;font-family:inherit;font-size:15px}
+.tab.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.hi{margin:0 0 12px;color:var(--mut)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <button class="ib" id="themeBtn" title="الوضع">◐</button>
+    <button class="ib" id="acc" title="الحساب">👤</button>
     <div class="logo" id="logo">VOKO7</div>
     <button class="ib" id="newBtn" title="جديد">＋</button>
   </header>
@@ -50,6 +56,8 @@ footer{margin-top:40px;text-align:center;color:var(--mut);font-size:13px}
 </div>
 <div class="toast" id="toast"></div>
 <script>
+/* ===== اختياري: إعدادات Firebase (لو سبتها فاضية الموقع يشتغل بالروابط الطويلة) ===== */
+var CFG={apiKey:"",authDomain:"",projectId:"",appId:""};
 (function(){
 var app=document.getElementById('app'),toastEl=document.getElementById('toast');
 function $(s){return document.querySelector(s)}
@@ -77,49 +85,109 @@ function copy(t){
   function fb(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast('تم النسخ ✓')}catch(e){toast('تعذر النسخ')}a.remove()}
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('تم النسخ ✓')},fb);else fb();
 }
+var pre=null,cloud=null;
+async function initCloud(){
+  if(!CFG.apiKey)return;
+  try{
+    var B='https://www.gstatic.com/firebasejs/10.14.1/';
+    var a=await import(B+'firebase-app.js'),au=await import(B+'firebase-auth.js'),f=await import(B+'firebase-firestore.js');
+    var fa=a.initializeApp(CFG),auth=au.getAuth(fa);
+    await new Promise(function(res){var un=au.onAuthStateChanged(auth,function(u){un();res(u)})});
+    if(!auth.currentUser)await au.signInAnonymously(auth);
+    cloud={fs:f.getFirestore(fa),auth:auth,f:f};
+  }catch(e){cloud=null}
+}
+function cid(){var c='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789',s='c';for(var i=0;i<6;i++)s+=c[Math.floor(Math.random()*c.length)];return s}
+async function cget(id){try{var s=await cloud.f.getDoc(cloud.f.doc(cloud.fs,'pastes',id));return s.exists()?s.data():null}catch(e){return null}}
+function users(){try{return JSON.parse(lsGet('v7users')||'{}')}catch(e){return{}}}
+function me(){var e=lsGet('v7session'),u=users()[e];return u?{email:e,name:u.name}:null}
+async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b),function(x){return('0'+x.toString(16)).slice(-2)}).join('')}
+function modal(html){var m=document.createElement('div');m.className='modal';m.innerHTML='<div class="box">'+html+'</div>';m.onclick=function(e){if(e.target===m)m.remove()};document.body.appendChild(m);return m}
+function setAcc(){var u=me();$('#acc').textContent=u?'✅':'👤';$('#acc').title=u?u.name:'الحساب'}
+function refresh(){setAcc();route()}
+function authModal(tab){
+  var m=modal('<div class="tabs"><button class="tab" id="t1">تسجيل دخول</button><button class="tab" id="t2">إنشاء حساب</button></div>'+
+    '<input id="nm" placeholder="الاسم"><input id="em" type="email" dir="ltr" placeholder="البريد الإلكتروني" autocomplete="email"><input id="pw" type="password" dir="ltr" placeholder="كلمة السر" autocomplete="current-password"><button class="btn" id="go" style="width:100%"></button>');
+  var up=tab==='up';
+  function set(){m.querySelector('#nm').style.display=up?'':'none';m.querySelector('#t1').classList.toggle('on',!up);m.querySelector('#t2').classList.toggle('on',up);m.querySelector('#go').textContent=up?'إنشاء الحساب':'دخول'}
+  set();
+  m.querySelector('#t1').onclick=function(){up=false;set()};
+  m.querySelector('#t2').onclick=function(){up=true;set()};
+  m.querySelector('#go').onclick=async function(){
+    if(!(window.crypto&&crypto.subtle))return toast('الموقع لازم يشتغل على https');
+    var em=m.querySelector('#em').value.trim().toLowerCase(),pw=m.querySelector('#pw').value,nm=m.querySelector('#nm').value.trim(),all=users();
+    if(!em||!pw)return toast('اكتب البريد وكلمة السر');
+    if(up){
+      if(!nm)return toast('اكتب الاسم');
+      if(pw.length<6)return toast('كلمة السر 6 حروف على الأقل');
+      if(all[em])return toast('البريد ده مسجل قبل كده، سجّل دخول');
+      var salt=Array.from(crypto.getRandomValues(new Uint8Array(8)),function(x){return('0'+x.toString(16)).slice(-2)}).join('');
+      all[em]={name:nm,salt:salt,hash:await sha(salt+pw)};lsSet('v7users',JSON.stringify(all));
+    }else{
+      var u=all[em];if(!u||await sha(u.salt+pw)!==u.hash)return toast('البريد أو كلمة السر غلط');
+    }
+    lsSet('v7session',em);m.remove();refresh();
+  };
+}
+function accModal(){var u=me(),m=modal('<p style="margin:0 0 4px;text-align:center;font-size:18px">'+esc(u.name)+'</p><p style="margin:0 0 14px;text-align:center;color:var(--mut);direction:ltr">'+esc(u.email)+'</p><button class="btn" id="lo" style="width:100%">تسجيل خروج</button>');
+  m.querySelector('#lo').onclick=function(){try{localStorage.removeItem('v7session')}catch(e){}m.remove();refresh()}}
 function home(){
   if(location.hash)history.replaceState(null,'',location.pathname+location.search);
-  app.innerHTML='<input class="name" id="fname" placeholder="file.js" dir="ltr">'+
+  var u=me(),p=pre;pre=null;
+  app.innerHTML='<p class="hi">'+(u?'أهلاً '+esc(u.name)+' 👋':'سجّل دخول عشان تحفظ لصقاتك وترجعلها 👤')+'</p>'+
+  '<input class="name" id="fname" placeholder="file.js" dir="ltr">'+
   '<div class="editor"><div class="gut" id="gut">1</div><textarea class="ta" id="ta" placeholder="ألصق هنا" spellcheck="false"></textarea></div>'+
-  '<div class="row"><button class="btn" id="send" disabled>إرسال</button><button class="sq" id="clr" title="مسح">🗑</button></div>'+
+  '<div class="row"><button class="btn" id="send" disabled>نشر</button><button class="sq" id="clr" title="مسح">🗑</button></div>'+
   '<div class="recent" id="recent"></div>';
   var ta=$('#ta'),gut=$('#gut'),send=$('#send');
   function upd(){gut.textContent=lines(ta.value);send.disabled=!ta.value.trim()}
+  if(p){$('#fname').value=p.n;ta.value=p.x;upd()}
   ta.addEventListener('input',upd);
   ta.addEventListener('scroll',function(){gut.scrollTop=ta.scrollTop});
   ta.addEventListener('keydown',function(e){if(e.key==='Tab'){e.preventDefault();var s=ta.selectionStart;ta.value=ta.value.slice(0,s)+'  '+ta.value.slice(ta.selectionEnd);ta.selectionStart=ta.selectionEnd=s+2;upd()}});
   $('#clr').onclick=function(){ta.value='';upd()};
   send.onclick=async function(){
-    send.disabled=true;send.textContent='جارٍ الإرسال...';
+    var u=me();if(!u)return authModal('in');
+    send.disabled=true;send.textContent='جارٍ النشر...';
     try{
-      var name=$('#fname').value.trim()||'file.txt',h=await encode({n:name,x:ta.value});
-      if(h.length>200000){toast('النص كبير جدًا للمشاركة بالرابط');send.disabled=false;send.textContent='إرسال';return}
-      try{var l=JSON.parse(lsGet('v7recent')||'[]');l.unshift({n:name,h:h,t:Date.now()});if(h.length>40000)l[0].h='';lsSet('v7recent',JSON.stringify(l.slice(0,8)))}catch(e){}
+      var name=$('#fname').value.trim()||'file.txt',h;
+      if(cloud){h=(p&&p.h&&p.h[0]==='c')?p.h:cid();await cloud.f.setDoc(cloud.f.doc(cloud.fs,'pastes',h),{n:name,x:ta.value,t:Date.now(),u:cloud.auth.currentUser.uid})}else h=await encode({n:name,x:ta.value});
+      if(h.length>200000){toast('النص كبير جدًا للمشاركة بالرابط');send.disabled=false;send.textContent='نشر';return}
+      try{var k='v7p_'+u.email,l=JSON.parse(lsGet(k)||'[]');if(p&&p.h)l=l.filter(function(x){return x.h!==p.h});l.unshift({n:name,h:h,t:Date.now()});lsSet(k,JSON.stringify(l.slice(0,30)))}catch(e){}
       location.hash=h;
-    }catch(e){toast('حدث خطأ');send.disabled=false;send.textContent='إرسال'}
+    }catch(e){toast('حدث خطأ');send.disabled=false;send.textContent='نشر'}
   };
-  try{var r=JSON.parse(lsGet('v7recent')||'[]').filter(function(x){return x.h});
-    if(r.length){var h='<h3>آخر ما أرسلته</h3>';r.forEach(function(x,i){h+='<div class="item" data-i="'+i+'"><span>'+esc(x.n)+'</span><span>'+new Date(x.t).toLocaleDateString('ar-EG')+'</span></div>'});$('#recent').innerHTML=h;
-      document.querySelectorAll('.item').forEach(function(el){el.onclick=function(){location.hash=r[el.dataset.i].h}})}}catch(e){}
+  if(u)try{var k2='v7p_'+u.email,r=JSON.parse(lsGet(k2)||'[]');
+    if(r.length){var h='<h3>منشوراتي</h3>';r.forEach(function(x,i){h+='<div class="item" data-i="'+i+'"><span>'+esc(x.n)+'</span><span style="color:var(--mut);font-size:13px">'+new Date(x.t).toLocaleDateString('ar-EG')+'</span><span data-d="'+i+'">🗑</span></div>'});$('#recent').innerHTML=h;
+      document.querySelectorAll('.item').forEach(function(el){el.onclick=function(){location.hash=r[el.dataset.i].h}});
+      document.querySelectorAll('[data-d]').forEach(function(el){el.onclick=async function(e){e.stopPropagation();if(confirm('تحذف المنشور ده؟')){var it=r[+el.dataset.d];if(cloud&&it.h[0]==='c')try{await cloud.f.deleteDoc(cloud.f.doc(cloud.fs,'pastes',it.h))}catch(x){}r.splice(+el.dataset.d,1);lsSet(k2,JSON.stringify(r));home()}}})}}catch(e){}
 }
 async function show(h){
   app.innerHTML='<div class="msg">جارٍ التحميل...</div>';
-  var p;try{p=await decode(h)}catch(e){p=null}
+  var p;try{p=(h[0]==='c'&&cloud)?await cget(h):await decode(h)}catch(e){p=null}
   if(!p||typeof p.x!=='string'){app.innerHTML='<div class="msg">الرابط غير صالح أو ناقص 😕<br><br><button class="tool" id="bk">الصفحة الرئيسية</button></div>';$('#bk').onclick=function(){location.hash=''};return}
-  var raw=false;
-  app.innerHTML='<div class="tools"><button class="tool" id="dl">⬇ تنزيل</button><button class="tool" id="rw">RAW</button><button class="tool" id="sh">🔗 مشاركة</button><button class="tool" id="cp">📋 نسخ</button></div>'+
+  var mine=false;try{var u=me();mine=!!u&&JSON.parse(lsGet('v7p_'+u.email)||'[]').some(function(x){return x.h===h})}catch(e){}
+  app.innerHTML='<div class="tools"><button class="tool" id="dl">⬇ تنزيل</button><button class="tool" id="rw">RAW</button><button class="tool" id="sh">🔗 مشاركة</button><button class="tool" id="cp">📋 نسخ</button>'+(mine?'<button class="tool" id="ed">✏ تعديل</button>':'')+'</div>'+
   '<p class="title">'+esc(p.n||'file.txt')+'</p><div class="editor"><div class="gut">'+lines(p.x)+'</div><pre class="view" id="pv">'+esc(p.x)+'</pre></div>';
   var pv=$('#pv');
-  $('#rw').onclick=function(){raw=!raw;pv.classList.toggle('raw',raw);this.classList.toggle('on',raw)};
+  $('#rw').onclick=function(){window.open(location.pathname+location.search+'#r'+h,'_blank')};
   $('#cp').onclick=function(){copy(p.x)};
+  if(mine)$('#ed').onclick=function(){pre={n:p.n,x:p.x,h:h};location.hash=''};
   $('#sh').onclick=function(){copy(location.href)};
   $('#dl').onclick=function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([p.x],{type:'text/plain'}));a.download=p.n||'file.txt';a.click()};
 }
-function route(){var h=location.hash.slice(1);if(h)show(h);else home()}
+async function rawView(h){
+  var p;try{p=(h[0]==='c'&&cloud)?await cget(h):await decode(h)}catch(e){p=null}
+  document.title=p?p.n:'VOKO7';
+  document.body.style.cssText='margin:0;background:#fff;color:#111';
+  document.body.innerHTML='<pre style="margin:0;padding:12px;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;direction:ltr;text-align:left"></pre>';
+  document.querySelector('pre').textContent=p?p.x:'الرابط غير صالح';
+}
+function route(){var h=location.hash.slice(1);if(h[0]==='r'){rawView(h.slice(1))}else if(h)show(h);else home()}
 $('#logo').onclick=$('#newBtn').onclick=function(){if(location.hash)location.hash='';else home()};
-$('#themeBtn').onclick=function(){var r=document.documentElement,dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#17171c';r.dataset.theme=dark?'light':'dark'};
+$('#acc').onclick=function(){me()?accModal():authModal('up')};
 window.addEventListener('hashchange',route);
-route();
+setAcc();initCloud().then(route);
 })();
 </script>
 </body>
